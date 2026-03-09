@@ -405,7 +405,7 @@ class RedeemRequest(BaseModel):
 app = FastAPI(title=APP_NAME)
 
 
-@app.get("/widget.js")
+@app.api_route("/widget.js", methods=["GET", "HEAD"])
 def widget_js():
     # Serve as plain JS (disable caching during rapid iteration)
     from fastapi.responses import FileResponse
@@ -417,7 +417,7 @@ def widget_js():
     )
 
 
-@app.get("/widget.css")
+@app.api_route("/widget.css", methods=["GET", "HEAD"])
 def widget_css():
     from fastapi.responses import FileResponse
 
