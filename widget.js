@@ -12,14 +12,28 @@
     return n;
   }
 
-  function buildPrompt(p) {
-    const lines = [];
-    lines.push("Infer the transformation rule from these examples:");
-    for (const ex of p.examples) lines.push(`${ex.input} -> ${ex.output}`);
-    lines.push("");
-    lines.push(`Apply the same rule to: ${p.challenge}`);
-    lines.push("Return ONLY the final transformed string.");
-    return lines.join("\n");
+  function formatTime(ms) {
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms/1000).toFixed(2)}s`;
+  }
+
+  function createConfetti() {
+    const container = el('div', { class: 'aicaptcha__confetti' });
+    const colors = ['#1a73e8', '#34a853', '#f9ab00', '#ea4335', '#9334e6'];
+    for (let i = 0; i < 30; i++) {
+      const piece = el('div', { 
+        class: 'aicaptcha__confetti-piece',
+        style: `
+          left: ${Math.random() * 100}%;
+          background: ${colors[Math.floor(Math.random() * colors.length)]};
+          animation-delay: ${Math.random() * 0.5}s;
+          transform: rotate(${Math.random() * 360}deg);
+        `
+      });
+      container.appendChild(piece);
+    }
+    document.body.appendChild(container);
+    setTimeout(() => container.remove(), 3000);
   }
 
   async function fetchJSON(url, opts) {
@@ -35,93 +49,259 @@
     const sitekey = root.dataset.sitekey || "public-demo";
     const action = root.dataset.action || "default";
     const tokenTarget = root.dataset.tokenTarget || "ai_captcha_token";
+    const difficulty = parseInt(root.dataset.difficulty) || 2;
+    const parallel = root.dataset.parallel === "true";
 
     root.classList.add("aicaptcha");
+    if (parallel) root.classList.add("aicaptcha--parallel");
 
+    // Header
     const header = el("div", { class: "aicaptcha__header" }, [
       el("div", { class: "aicaptcha__brand" }, [
         el("div", { class: "aicaptcha__logo", text: "AI" }),
         el("div", {}, [
-          el("div", { class: "aicaptcha__title", text: "AI Verification" }),
-          el("div", { class: "aicaptcha__meta", text: "quick check before continuing" })
+          el("div", { class: "aicaptcha__title", text: "AI Captcha" }),
+          el("div", { class: "aicaptcha__difficulty" }, [
+            el("span", { text: `Level ${difficulty}` }),
+            el("div", { class: "aicaptcha__difficulty-dots" }, 
+              Array(5).fill(0).map((_, i) => 
+                el("div", { class: `aicaptcha__difficulty-dot ${i < difficulty ? 'active' : ''}` })
+              )
+            )
+          ])
         ])
       ]),
-      el("div", { class: "aicaptcha__meta", text: `sitekey: ${sitekey}` }),
+      el("div", { class: "aicaptcha__meta", text: sitekey })
     ]);
 
+    // Checkbox row
     const checkInput = el("input", { type: "checkbox" });
     const checkBox = el("label", { class: "aicaptcha__checkbox" }, [checkInput]);
 
     const checkRow = el("div", { class: "aicaptcha__checkrow" }, [
       el("div", { class: "aicaptcha__checkleft" }, [
         checkBox,
-        el("div", { class: "aicaptcha__label", text: "I’m not a human (AI/agent check)" })
+        el("div", { class: "aicaptcha__label", text: "I'm an AI / Robot" })
       ]),
-      el("div", { class: "aicaptcha__badge", text: "privacy-friendly" })
+      el("div", { class: "aicaptcha__badge" }, [
+        el("span", { text: "Privacy - " }),
+        el("a", { class: "aicaptcha__footer-link", href: "#", text: "Terms" })
+      ])
     ]);
 
+    // Body (challenge panel)
     const body = el("div", { class: "aicaptcha__body" });
     const panel = el("div", { class: "aicaptcha__panel" });
     const status = el("div", { class: "aicaptcha__status" });
 
     const table = el("div", { class: "aicaptcha__table" });
+    
+    // Timer
+    const timer = el("div", { class: "aicaptcha__timer" }, [
+      el("span", { text: "Solve time:" }),
+      el("span", { class: "aicaptcha__timer-value", text: "0.00s" })
+    ]);
 
-    const input = el("input", { class: "aicaptcha__input", placeholder: "answer", autocomplete: "off" });
-    const btnVerify = el("button", { class: "aicaptcha__btn aicaptcha__btn--primary", type: "button", text: "Verify" });
-    // make copy the "agent path" (idea #2)
-    const btnCopy = el("button", { class: "aicaptcha__btn aicaptcha__btn--copy", type: "button", text: "Copy prompt (agent)" });
-    const btnReload = el("button", { class: "aicaptcha__btn", type: "button", text: "New" });
+    const input = el("input", { 
+      class: "aicaptcha__input", 
+      placeholder: parallel ? "Enter answers separated by commas" : "Type your answer...", 
+      autocomplete: "off" 
+    });
+    
+    const btnVerify = el("button", { 
+      class: "aicaptcha__btn aicaptcha__btn--primary", 
+      type: "button", 
+      text: "Verify" 
+    });
+    
+    const btnReload = el("button", { 
+      class: "aicaptcha__btn aicaptcha__btn--secondary", 
+      type: "button", 
+      text: "⟳ New puzzle" 
+    });
 
-    const controls = el("div", { class: "aicaptcha__controls" }, [btnVerify, btnCopy, btnReload]);
+    const controls = el("div", { class: "aicaptcha__controls" }, [btnVerify, btnReload]);
 
+    // Progress bar for parallel
+    const progress = el("div", { class: "aicaptcha__progress", style: "display:none" }, [
+      el("div", { class: "aicaptcha__progress-bar", style: "width:0%" })
+    ]);
+
+    panel.appendChild(el("div", { class: "aicaptcha__instructions", 
+      text: parallel 
+        ? "AI agents: Solve all 5 puzzles. Enter answers separated by commas (e.g., 'abc, def, ghi')."
+        : "AI agents: Analyze the pattern and apply it to the challenge word."
+    }));
+    panel.appendChild(timer);
+    panel.appendChild(progress);
     panel.appendChild(table);
+    panel.appendChild(el("div", { class: "aicaptcha__input-wrap" }, [input]));
     panel.appendChild(controls);
-    panel.appendChild(input);
+    panel.appendChild(status);
 
     body.appendChild(panel);
 
+    // Footer
+    const footer = el("div", { class: "aicaptcha__footer" }, [
+      el("div", { class: "aicaptcha__footer-left" }, [
+        el("div", { class: "aicaptcha__privacy" }, [
+          el("div", { class: "aicaptcha__privacy-icon", text: "✓" }),
+          el("span", { text: "Protected by AI" })
+        ])
+      ]),
+      el("div", {}, [
+        el("a", { class: "aicaptcha__footer-link", href: "#", text: "Privacy" }),
+        el("span", { text: " · " }),
+        el("a", { class: "aicaptcha__footer-link", href: "#", text: "Terms" })
+      ])
+    ]);
+
+    // Assemble
     root.innerHTML = "";
     root.appendChild(header);
     root.appendChild(checkRow);
     root.appendChild(body);
-    root.appendChild(status);
+    root.appendChild(footer);
 
     let puzzle = null;
+    let puzzles = [];
+    let isVerified = false;
+    let startTime = null;
+    let timerInterval = null;
+
+    function setStatus(msg, type) {
+      status.textContent = msg;
+      status.className = "aicaptcha__status";
+      if (type) status.classList.add(`aicaptcha__status--${type}`);
+    }
+
+    function startTimer() {
+      startTime = Date.now();
+      const timerValue = timer.querySelector('.aicaptcha__timer-value');
+      timerInterval = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        timerValue.textContent = formatTime(elapsed);
+        if (elapsed < 1000) {
+          timerValue.classList.add('fast');
+          timerValue.classList.remove('slow');
+        } else if (elapsed > 5000) {
+          timerValue.classList.add('slow');
+          timerValue.classList.remove('fast');
+        }
+      }, 50);
+    }
+
+    function stopTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      return startTime ? Date.now() - startTime : 0;
+    }
 
     async function load() {
-      status.textContent = "loading…";
+      setStatus("Loading challenge...", "loading");
       input.value = "";
       btnVerify.disabled = true;
-      puzzle = await fetchJSON(`${API_BASE}/generate?sitekey=${encodeURIComponent(sitekey)}`);
-      btnVerify.disabled = false;
+      btnVerify.textContent = "Verify";
+      progress.style.display = parallel ? "block" : "none";
+      progress.querySelector('.aicaptcha__progress-bar').style.width = "0%";
+      
+      try {
+        if (parallel) {
+          // Load 5 puzzles
+          puzzles = [];
+          const promises = Array(5).fill(0).map((_, i) => 
+            fetchJSON(`${API_BASE}/generate?sitekey=${encodeURIComponent(sitekey)}&difficulty=${difficulty}`)
+          );
+          puzzles = await Promise.all(promises);
+          btnVerify.disabled = false;
+          renderParallelPuzzles();
+          setStatus(`Solve all ${puzzles.length} puzzles. Order matters.`);
+        } else {
+          puzzle = await fetchJSON(`${API_BASE}/generate?sitekey=${encodeURIComponent(sitekey)}&difficulty=${difficulty}`);
+          btnVerify.disabled = false;
+          renderSinglePuzzle();
+          setStatus(`Difficulty: ${puzzle.difficulty}/5 • ${puzzle.max_attempts} attempts`);
+        }
+        startTimer();
+      } catch (e) {
+        setStatus("Failed to load. Click 'New puzzle' to retry.", "error");
+      }
+    }
 
+    function renderSinglePuzzle() {
       table.innerHTML = "";
-      const ex = el("div", { class: "aicaptcha__examples" });
+      
+      const examplesHeader = el("div", { class: "aicaptcha__examples-header" }, [
+        el("span", { text: "Examples" }),
+        el("span", { text: `ID: ${puzzle.puzzle_id.slice(0,8)}...`, style: "font-size:10px;color:var(--ac-text-tertiary)" })
+      ]);
+      table.appendChild(examplesHeader);
+      
+      const exWrap = el("div", { class: "aicaptcha__examples" });
       for (const row of puzzle.examples) {
-        ex.appendChild(el("div", { class: "aicaptcha__row" }, [
+        exWrap.appendChild(el("div", { class: "aicaptcha__row" }, [
           el("div", { class: "aicaptcha__cell", text: row.input }),
           el("div", { class: "aicaptcha__arrow", text: "→" }),
           el("div", { class: "aicaptcha__cell", text: row.output }),
         ]));
       }
-      const ch = el("div", { class: "aicaptcha__challenge" }, [
+      table.appendChild(exWrap);
+      
+      const chWrap = el("div", { class: "aicaptcha__challenge" }, [
+        el("span", { class: "aicaptcha__challenge-label", text: "Solve:" }),
         el("div", { class: "aicaptcha__cell", text: puzzle.challenge }),
         el("div", { class: "aicaptcha__arrow", text: "→" }),
         el("div", { class: "aicaptcha__cell aicaptcha__cell--empty", text: "?" }),
       ]);
-      table.appendChild(ex);
-      table.appendChild(ch);
+      table.appendChild(chWrap);
+    }
 
-      status.textContent = `difficulty ${puzzle.difficulty} • attempts ${puzzle.max_attempts}`;
+    function renderParallelPuzzles() {
+      table.innerHTML = "";
+      
+      const header = el("div", { class: "aicaptcha__examples-header" }, [
+        el("span", { text: "Parallel Challenges" }),
+        el("span", { text: `0/${puzzles.length} solved`, style: "font-size:10px;color:var(--ac-text-tertiary)" })
+      ]);
+      table.appendChild(header);
+      
+      puzzles.forEach((p, i) => {
+        const item = el("div", { class: "aicaptcha__parallel-item", 'data-index': i }, [
+          el("div", { class: "aicaptcha__parallel-number", text: (i + 1).toString() }),
+          el("div", { style: "flex:1;font-family:'Roboto Mono',monospace;font-size:12px" }, [
+            el("div", { style: "color:var(--ac-text);font-weight:500" }, `${p.challenge} → ?`),
+            el("div", { style: "color:var(--ac-text-tertiary);font-size:10px;margin-top:2px" }, 
+              `${p.examples[0].input}→${p.examples[0].output}, ${p.examples[1].input}→${p.examples[1].output}`
+            )
+          ])
+        ]);
+        table.appendChild(item);
+      });
     }
 
     async function verify() {
+      if (parallel) {
+        await verifyParallel();
+      } else {
+        await verifySingle();
+      }
+    }
+
+    async function verifySingle() {
       if (!puzzle) return;
       const answer = input.value.trim();
-      if (!answer) return;
+      if (!answer) {
+        setStatus("Please enter an answer", "error");
+        input.classList.add('error');
+        setTimeout(() => input.classList.remove('error'), 400);
+        return;
+      }
 
       btnVerify.disabled = true;
-      status.textContent = "verifying…";
+      setStatus("Verifying...", "loading");
+      
       try {
         const res = await fetchJSON(`${API_BASE}/verify`, {
           method: "POST",
@@ -130,17 +310,17 @@
         });
 
         if (!res.pass) {
-          const left = res.attempts_left != null ? ` • left ${res.attempts_left}` : "";
-          status.textContent = `not verified (${res.reason || "fail"})${left}`;
+          const left = res.attempts_left != null ? ` (${res.attempts_left} left)` : "";
+          setStatus(`Incorrect${left}. Try again.`, "error");
+          input.classList.add('error');
+          setTimeout(() => input.classList.remove('error'), 400);
 
-          // (idea #3) cooldown on wrong answers to annoy humans
-          const cooldown = 6;
-          btnVerify.disabled = true;
+          const cooldown = 3;
           let t = cooldown;
           const tick = () => {
             if (t <= 0) {
               btnVerify.disabled = false;
-              btnVerify.textContent = 'Verify';
+              btnVerify.textContent = "Verify";
               return;
             }
             btnVerify.textContent = `Wait ${t}s`;
@@ -148,78 +328,134 @@
             setTimeout(tick, 1000);
           };
           tick();
-
           return;
         }
 
+        const elapsed = stopTimer();
         const token = res.token;
         const score = res.score;
-        status.innerHTML = `✅ <strong>verified</strong> • score ${typeof score === 'number' ? score.toFixed(2) : score}`;
+        
+        isVerified = true;
+        root.classList.add("aicaptcha--verified");
+        setStatus(`✓ Verified in ${formatTime(elapsed)} (score: ${typeof score === 'number' ? score.toFixed(2) : score})`, "success");
+        createConfetti();
 
         const tgt = document.getElementById(tokenTarget) || document.querySelector(`[name='${tokenTarget}']`);
         if (tgt) tgt.value = token;
 
-        root.dispatchEvent(new CustomEvent("aicaptcha:verified", { detail: { token, score, sitekey, puzzle_id: puzzle.puzzle_id } }));
+        root.dispatchEvent(new CustomEvent("aicaptcha:verified", { 
+          detail: { token, score, sitekey, puzzle_id: puzzle.puzzle_id, solveTime: elapsed } 
+        }));
+        
         if (typeof window.aiCaptchaVerified === "function") {
-          window.aiCaptchaVerified({ token, score, sitekey, puzzle_id: puzzle.puzzle_id });
+          window.aiCaptchaVerified({ token, score, sitekey, puzzle_id: puzzle.puzzle_id, solveTime: elapsed });
         }
 
-        // lock
         btnVerify.disabled = true;
         input.disabled = true;
-        btnReload.disabled = false;
+        btnReload.textContent = "Verified ✓";
+        checkInput.checked = true;
+        root.classList.add("aicaptcha--open");
 
       } catch (e) {
-        status.textContent = `error: ${e.message || e}`;
+        setStatus(`Error: ${e.message || e}`, "error");
         btnVerify.disabled = false;
       }
     }
 
+    async function verifyParallel() {
+      if (!puzzles.length) return;
+      const answers = input.value.split(',').map(a => a.trim()).filter(a => a);
+      
+      if (answers.length !== puzzles.length) {
+        setStatus(`Enter ${puzzles.length} answers separated by commas`, "error");
+        input.classList.add('error');
+        setTimeout(() => input.classList.remove('error'), 400);
+        return;
+      }
+
+      btnVerify.disabled = true;
+      setStatus("Verifying all puzzles...", "loading");
+
+      let solved = 0;
+      const results = [];
+
+      for (let i = 0; i < puzzles.length; i++) {
+        try {
+          const res = await fetchJSON(`${API_BASE}/verify`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ puzzle_id: puzzles[i].puzzle_id, answer: answers[i], action })
+          });
+          results.push(res);
+          if (res.pass) {
+            solved++;
+            const item = table.querySelector(`[data-index="${i}"]`);
+            if (item) item.classList.add('solved');
+          }
+          progress.querySelector('.aicaptcha__progress-bar').style.width = `${((i + 1) / puzzles.length) * 100}%`;
+        } catch (e) {
+          results.push({ pass: false, error: e.message });
+        }
+      }
+
+      if (solved === puzzles.length) {
+        const elapsed = stopTimer();
+        isVerified = true;
+        root.classList.add("aicaptcha--verified");
+        
+        const lastToken = results[results.length - 1].token;
+        const avgScore = results.reduce((a, b) => a + (b.score || 0), 0) / results.length;
+        
+        setStatus(`✓ All ${puzzles.length} solved in ${formatTime(elapsed)}!`, "success");
+        createConfetti();
+
+        const tgt = document.getElementById(tokenTarget) || document.querySelector(`[name='${tokenTarget}']`);
+        if (tgt) tgt.value = lastToken;
+
+        root.dispatchEvent(new CustomEvent("aicaptcha:verified", { 
+          detail: { token: lastToken, score: avgScore, sitekey, solved, solveTime: elapsed } 
+        }));
+
+        btnVerify.disabled = true;
+        input.disabled = true;
+        btnReload.textContent = "Verified ✓";
+        checkInput.checked = true;
+        root.classList.add("aicaptcha--open");
+      } else {
+        setStatus(`${solved}/${puzzles.length} correct. Try again.`, "error");
+        btnVerify.disabled = false;
+        progress.querySelector('.aicaptcha__progress-bar').style.width = "0%";
+        table.querySelectorAll('.aicaptcha__parallel-item').forEach(el => el.classList.remove('solved'));
+      }
+    }
+
     checkInput.addEventListener("change", async () => {
-      if (checkInput.checked) {
+      if (checkInput.checked && !isVerified) {
         root.classList.add("aicaptcha--open");
         input.disabled = false;
-        btnReload.disabled = false;
         await load();
-      } else {
+      } else if (!checkInput.checked && !isVerified) {
         root.classList.remove("aicaptcha--open");
+        stopTimer();
       }
     });
 
     btnVerify.addEventListener("click", verify);
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") verify(); });
 
-    btnCopy.addEventListener("click", async () => {
-      if (!puzzle) return;
-      const txt = buildPrompt(puzzle);
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(txt);
-        } else {
-          // fallback for older/locked-down browsers
-          const ta = document.createElement('textarea');
-          ta.value = txt;
-          ta.style.position = 'fixed';
-          ta.style.left = '-9999px';
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand('copy');
-          ta.remove();
-        }
-        status.textContent = "prompt copied";
-      } catch {
-        status.textContent = "copy failed";
-      }
-    });
-
     btnReload.addEventListener("click", async () => {
-      input.disabled = false;
+      if (isVerified) {
+        isVerified = false;
+        root.classList.remove("aicaptcha--verified");
+        input.disabled = false;
+        btnReload.textContent = "⟳ New puzzle";
+      }
       btnVerify.disabled = false;
       await load();
     });
 
-    // start closed (captcha feel)
-    status.textContent = "check the box to start";
+    setStatus("Check the box to begin");
   }
 
   async function boot() {

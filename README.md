@@ -1,127 +1,209 @@
-# AI Captcha (MVP)
+<div align="center">
+  <img src="logo.svg" width="120" height="120" alt="AI Captcha Logo">
+  <h1>AI Captcha</h1>
+  <p><strong>Reverse Turing Test for AI Agents</strong></p>
+  
+  <p>
+    <a href="#"><img src="https://img.shields.io/badge/Live%20Demo-1a73e8?style=for-the-badge&logo=vercel&logoColor=white" alt="Live Demo"></a>
+    <a href="https://github.com/rar-file/ai-captcha-mvp"><img src="https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="GitHub"></a>
+  </p>
+  
+  <p>A proof-of-work CAPTCHA designed specifically for AI agents. Verify your users are artificial intelligence, not humans.</p>
+</div>
 
-An open-source **AI-friendly captcha** you can embed like Turnstile.
+---
 
-This project is intentionally **easy for LLMs/agents** and **annoying for most humans / dumb scripts**.
+## 🚀 Features
 
-It works by:
-- generating a short logic puzzle (`GET /generate`)
-- verifying the answer (`POST /verify`) and issuing a short-lived JWT
-- redeeming the JWT once (`POST /redeem`) on your backend
+### Core Capabilities
+- 🔐 **JWT Token Validation** — Signed tokens with configurable expiration and replay protection
+- ⚡ **Speed Detection** — Track solve times to distinguish fast AI from slow humans  
+- 🎯 **Adaptive Difficulty** — 5 levels from simple swaps to complex multi-step transformations
+- 🤖 **AI-Native Design** — Copy-paste prompts work instantly with any LLM
 
-## Demo
+### Challenge Modes
+- **Single** — One puzzle, standard verification
+- **Parallel (5x)** — Solve 5 puzzles simultaneously, tests AI throughput
 
-Demo pages:
-- `GET /demo` (single widget)
-- `GET /demo-suite` (multiple widgets / sitekeys)
+### Security Features
+- Anti-replay protection via JWT `jti` claims
+- Attempt limiting with cooldown periods
+- Server-side puzzle expiration
+- Score-based confidence ratings
 
-If you’re running it on a host with a reachable IP:
-- `http://HOST:8099/demo`
-- `http://HOST:8099/demo-suite`
+---
 
-## What it blocks (and what it doesn’t)
+## 📖 How It Works
 
-- ✅ blocks casual humans (they won’t bother)
-- ✅ blocks simple scripts (rate limits + attempts + cooldown)
-- ❌ **does not** block someone who uses an LLM API to solve it (that’s the point)
+Traditional CAPTCHAs try to prove you're human. **AI Captcha** does the opposite — it verifies the user is an AI agent.
 
-## Quickstart
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│   AI Agent  │────>│  AI Captcha  │────>│ Your Server │
+│   (User)    │     │  (Challenge) │     │  (Verify)   │
+└─────────────┘     └──────────────┘     └─────────────┘
+       │                                          ▲
+       │           JWT Token                      │
+       └──────────────────────────────────────────┘
+```
+
+1. **Challenge Generation** — Server creates pattern-based puzzles (swaps, rotations, Caesar shifts)
+2. **AI Solves** — LLM analyzes examples, infers the transformation rule
+3. **Verification** — Answer is verified, JWT token minted
+4. **Redemption** — Your server validates the JWT cryptographically
+
+---
+
+## 🛠️ Installation
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+# Clone the repository
+git clone https://github.com/rar-file/ai-captcha-mvp.git
+cd ai-captcha-mvp
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
 
-export AI_CAPTCHA_JWT_SECRET='change-me'
-uvicorn app:app --host 0.0.0.0 --port 8099
+# Run server
+uvicorn app:app --host 0.0.0.0 --port 8080
 ```
 
-## Drop-in widget (Turnstile-ish)
+### Environment Variables
 
-Serve the widget from the same origin as the API.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AI_CAPTCHA_JWT_SECRET` | `dev-secret-change-me` | JWT signing key |
+| `AI_CAPTCHA_JWT_ISSUER` | `ai-captcha-mvp` | JWT issuer claim |
+| `AI_CAPTCHA_PUZZLE_TTL` | `120` | Puzzle expiration (seconds) |
+| `AI_CAPTCHA_TOKEN_TTL` | `120` | Token expiration (seconds) |
+
+---
+
+## 💻 Usage
+
+### Basic Frontend Integration
 
 ```html
-<link rel="stylesheet" href="https://yourdomain.com/widget.css" />
-<script src="https://yourdomain.com/widget.js" defer></script>
+<!-- Include the widget -->
+<div class="ai-captcha" 
+     data-sitekey="your-sitekey"
+     data-token-target="ai_captcha_token"></div>
 
-<form method="POST" action="/submit">
-  <div class="ai-captcha" data-sitekey="public-demo" data-token-target="ai_captcha_token"></div>
-  <input type="hidden" id="ai_captcha_token" name="ai_captcha_token" />
-  <button type="submit">Continue</button>
-</form>
+<input type="hidden" id="ai_captcha_token" name="ai_captcha_token">
+
+<!-- Load the widget -->
+<script src="https://your-server.com/widget.js" defer></script>
+
+<!-- Listen for verification -->
+<script>
+document.querySelector('.ai-captcha').addEventListener('aicaptcha:verified', (e) => {
+  console.log('Verified!', e.detail.token, e.detail.score);
+});
+</script>
 ```
 
-### Widget hooks
+### Backend Verification
 
-- Emits an event: `aicaptcha:verified`
-  - `detail = { token, score, sitekey, puzzle_id }`
-- Optional global callback:
-  - `window.aiCaptchaVerified = ({ token, score, sitekey, puzzle_id }) => { ... }`
+```python
+import jwt
 
-### Sitekeys (difficulty)
-
-`GET /generate?sitekey=...`
-
-Built-in presets:
-- `public-demo` (easy-ish)
-- `default`
-- `hard` (more steps, fewer attempts)
-
-## API
-
-### `GET /generate`
-
-```bash
-curl -s "http://127.0.0.1:8099/generate?sitekey=public-demo" | jq
+# Verify the token
+token = request.headers.get('X-AI-Captcha-Token')
+try:
+    payload = jwt.decode(
+        token, 
+        JWT_SECRET, 
+        algorithms=["HS256"],
+        issuer="ai-captcha-mvp"
+    )
+    # Token valid — user is AI
+    score = payload['score']  # 0.0 - 1.0 confidence
+except jwt.InvalidTokenError:
+    # Token invalid
+    pass
 ```
 
-Response includes:
-- `puzzle_id`, `examples[]`, `challenge`
-- `difficulty`, `max_attempts`, `expires_at`
+---
 
-### `POST /verify`
+## 🎮 Challenge Types
 
-```bash
-curl -s http://127.0.0.1:8099/verify \
-  -H 'Content-Type: application/json' \
-  -d '{"puzzle_id":"PUZZLE_ID","answer":"ANSWER","action":"signup"}' | jq
+| Type | Description | Difficulty |
+|------|-------------|------------|
+| **Swap** | Swap characters at positions i,j | ⭐ |
+| **Rotate** | Rotate string by k positions | ⭐⭐ |
+| **Caesar** | Caesar cipher shift | ⭐⭐⭐ |
+| **Reverse** | Reverse entire string | ⭐⭐ |
+| **Compose** | Multiple operations chained | ⭐⭐⭐⭐⭐ |
+
+---
+
+## 📊 Difficulty Levels
+
+| Level | Operations | Parameters | Best For |
+|-------|------------|------------|----------|
+| 1 | 1-2 | Limited range | Testing |
+| 2 | 2-3 | Moderate range | Standard bots |
+| 3 | 3-4 | Full range | Smart agents |
+| 4 | 4-5 | Extended range | Advanced AI |
+| 5 | 5+ | Maximum complexity | State-of-the-art |
+
+---
+
+## 🏗️ Architecture
+
+```
+ai-captcha/
+├── app.py              # FastAPI server
+├── widget.js           # Frontend widget
+├── widget.css          # Widget styles
+├── logo.svg            # Brand logo
+├── requirements.txt    # Python deps
+└── README.md          # This file
 ```
 
-- On success: `{ pass: true, token, score }`
-- On fail: `{ pass: false, reason, attempts_left }`
+### API Endpoints
 
-### `POST /redeem` (server-side)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/generate` | GET | Create new puzzle |
+| `/verify` | POST | Submit answer |
+| `/redeem` | POST | Validate JWT token |
+| `/demo` | GET | Interactive demo |
+| `/widget.js` | GET | Widget script |
+| `/widget.css` | GET | Widget styles |
 
-Redeem from **your backend**, not the browser.
+---
 
-```bash
-curl -s http://127.0.0.1:8099/redeem \
-  -H 'Content-Type: application/json' \
-  -d '{"token":"JWT_HERE"}' | jq
-```
+## 🤝 Contributing
 
-- One-time redeem per token (`already_redeemed` after).
+Contributions welcome! Areas for improvement:
 
-## How the puzzles work
+- [ ] More puzzle types (base64, hex, unicode)
+- [ ] Rate limiting per IP/sitekey
+- [ ] Redis backend for production scale
+- [ ] WebSocket real-time challenges
+- [ ] Multi-language prompt support
 
-Each request builds a small random **program** (1–5 steps depending on difficulty), e.g.
-- `swap(i,j)`
-- `rotate(k)`
-- `reverse`
-- `caesar(k)`
+---
 
-The program changes every request so it’s hard to “patternise” with hard-coded rules.
+## 📜 License
 
-## Security / production notes
+MIT License — see [LICENSE](LICENSE) for details.
 
-This is an MVP.
+---
 
-For real usage:
-- use Redis/DB for puzzle storage + redeemed JTIs
-- add IP + user-agent rate limits (and maybe a server-side cooldown)
-- bind token to `origin`/`action`/`audience`
-- rotate `AI_CAPTCHA_JWT_SECRET`
+## 🙏 Acknowledgments
 
-## License
+- Built with [FastAPI](https://fastapi.tiangolo.com/)
+- Inspired by reCAPTCHA but inverted for AI
 
-Pick a license (MIT is typical for open source). Add `LICENSE` when ready.
+---
+
+<div align="center">
+  <p><strong>Not affiliated with Google or reCAPTCHA.</strong></p>
+  <p>Made with 🤖 for 🤖</p>
+</div>
