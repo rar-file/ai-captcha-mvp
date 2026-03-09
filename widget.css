@@ -1,16 +1,43 @@
-.aicaptcha{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;max-width:520px;border:1px solid #2b2f3a;border-radius:14px;background:#0b0d12;color:#e9edf7;padding:14px}
-.aicaptcha__header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
-.aicaptcha__title{font-weight:700;letter-spacing:.2px}
-.aicaptcha__meta{font-size:12px;color:#9aa6c1}
-.aicaptcha__table{background:#0f121a;border:1px solid #232a3a;border-radius:12px;padding:10px}
+:root{--ai-bg:#ffffff;--ai-card:#ffffff;--ai-border:#e6e8ef;--ai-text:#0f172a;--ai-muted:#64748b;--ai-accent:#2563eb;--ai-accent-2:#1d4ed8;--ai-soft:#f1f5ff;--ai-shadow:0 10px 30px rgba(15,23,42,.08)}
+
+.aicaptcha{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;max-width:520px;border:1px solid var(--ai-border);border-radius:16px;background:var(--ai-card);color:var(--ai-text);padding:14px 14px 12px;box-shadow:var(--ai-shadow)}
+
+.aicaptcha__header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.aicaptcha__brand{display:flex;align-items:center;gap:10px}
+.aicaptcha__logo{width:34px;height:34px;border-radius:12px;background:var(--ai-soft);border:1px solid var(--ai-border);display:grid;place-items:center;color:var(--ai-accent);font-weight:800}
+.aicaptcha__title{font-weight:750;letter-spacing:.2px}
+.aicaptcha__meta{font-size:12px;color:var(--ai-muted)}
+
+.aicaptcha__checkrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--ai-border);border-radius:14px;background:#fbfcff}
+.aicaptcha__checkleft{display:flex;align-items:center;gap:10px}
+.aicaptcha__checkbox{width:18px;height:18px;border-radius:5px;border:1.5px solid #cbd5e1;display:grid;place-items:center;background:#fff;cursor:pointer;position:relative}
+.aicaptcha__checkbox input{appearance:none;-webkit-appearance:none;width:18px;height:18px;margin:0;cursor:pointer}
+.aicaptcha__checkbox::after{content:"";width:10px;height:6px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:rotate(-45deg) scale(0);transition:transform .12s ease;position:absolute}
+.aicaptcha--open .aicaptcha__checkbox{background:var(--ai-accent);border-color:var(--ai-accent)}
+.aicaptcha--open .aicaptcha__checkbox::after{transform:rotate(-45deg) scale(1)}
+.aicaptcha__label{font-size:14px;color:var(--ai-text)}
+.aicaptcha__badge{font-size:12px;color:var(--ai-muted)}
+
+.aicaptcha__body{margin-top:10px}
+.aicaptcha__panel{border:1px solid var(--ai-border);border-radius:14px;background:#ffffff;padding:10px;max-height:0;opacity:0;overflow:hidden;transform:translateY(-6px);transition:max-height .28s ease, opacity .22s ease, transform .22s ease}
+.aicaptcha--open .aicaptcha__panel{max-height:520px;opacity:1;transform:translateY(0)}
+
+.aicaptcha__table{background:#f8fafc;border:1px solid var(--ai-border);border-radius:12px;padding:10px}
 .aicaptcha__examples{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
 .aicaptcha__row,.aicaptcha__challenge{display:flex;align-items:center;gap:10px}
-.aicaptcha__cell{min-width:90px;padding:6px 8px;background:#0b0d12;border:1px solid #222a3c;border-radius:10px}
-.aicaptcha__cell--empty{opacity:.7}
-.aicaptcha__arrow{opacity:.8}
-.aicaptcha__controls{display:flex;gap:8px;margin:10px 0}
-.aicaptcha__btn{border:1px solid #2b3550;background:#1a2440;color:#e9edf7;padding:8px 10px;border-radius:10px;cursor:pointer}
-.aicaptcha__btn--secondary{background:#0b0d12}
+.aicaptcha__cell{min-width:90px;padding:7px 10px;background:#ffffff;border:1px solid var(--ai-border);border-radius:12px;font-variant-ligatures:none}
+.aicaptcha__cell--empty{opacity:.65}
+.aicaptcha__arrow{opacity:.7}
+
+.aicaptcha__controls{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 8px}
+.aicaptcha__btn{border:1px solid var(--ai-border);background:#ffffff;color:var(--ai-text);padding:8px 10px;border-radius:12px;cursor:pointer;font-weight:650}
+.aicaptcha__btn:hover{border-color:#cbd5e1}
+.aicaptcha__btn--primary{background:var(--ai-accent);border-color:var(--ai-accent);color:#fff}
+.aicaptcha__btn--primary:hover{background:var(--ai-accent-2);border-color:var(--ai-accent-2)}
 .aicaptcha__btn:disabled{opacity:.6;cursor:not-allowed}
-.aicaptcha__input{width:100%;box-sizing:border-box;border:1px solid #2b3550;background:#0b0d12;color:#e9edf7;padding:10px 12px;border-radius:10px}
-.aicaptcha__status{margin-top:10px;font-size:13px;color:#b8c2da}
+
+.aicaptcha__input{width:100%;box-sizing:border-box;border:1px solid var(--ai-border);background:#ffffff;color:var(--ai-text);padding:10px 12px;border-radius:12px;outline:none}
+.aicaptcha__input:focus{border-color:rgba(37,99,235,.55);box-shadow:0 0 0 4px rgba(37,99,235,.10)}
+
+.aicaptcha__status{margin-top:10px;font-size:13px;color:var(--ai-muted)}
+.aicaptcha__status strong{color:var(--ai-text)}

@@ -272,17 +272,25 @@ app = FastAPI(title=APP_NAME)
 
 @app.get("/widget.js")
 def widget_js():
-    # Serve as plain JS
+    # Serve as plain JS (disable caching during rapid iteration)
     from fastapi.responses import FileResponse
 
-    return FileResponse("widget.js", media_type="application/javascript")
+    return FileResponse(
+        "widget.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/widget.css")
 def widget_css():
     from fastapi.responses import FileResponse
 
-    return FileResponse("widget.css", media_type="text/css")
+    return FileResponse(
+        "widget.css",
+        media_type="text/css",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/demo")
