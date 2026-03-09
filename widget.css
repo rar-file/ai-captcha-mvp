@@ -1,0 +1,16 @@
+.aicaptcha{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;max-width:520px;border:1px solid #2b2f3a;border-radius:14px;background:#0b0d12;color:#e9edf7;padding:14px}
+.aicaptcha__header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px}
+.aicaptcha__title{font-weight:700;letter-spacing:.2px}
+.aicaptcha__meta{font-size:12px;color:#9aa6c1}
+.aicaptcha__table{background:#0f121a;border:1px solid #232a3a;border-radius:12px;padding:10px}
+.aicaptcha__examples{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.aicaptcha__row,.aicaptcha__challenge{display:flex;align-items:center;gap:10px}
+.aicaptcha__cell{min-width:90px;padding:6px 8px;background:#0b0d12;border:1px solid #222a3c;border-radius:10px}
+.aicaptcha__cell--empty{opacity:.7}
+.aicaptcha__arrow{opacity:.8}
+.aicaptcha__controls{display:flex;gap:8px;margin:10px 0}
+.aicaptcha__btn{border:1px solid #2b3550;background:#1a2440;color:#e9edf7;padding:8px 10px;border-radius:10px;cursor:pointer}
+.aicaptcha__btn--secondary{background:#0b0d12}
+.aicaptcha__btn:disabled{opacity:.6;cursor:not-allowed}
+.aicaptcha__input{width:100%;box-sizing:border-box;border:1px solid #2b3550;background:#0b0d12;color:#e9edf7;padding:10px 12px;border-radius:10px}
+.aicaptcha__status{margin-top:10px;font-size:13px;color:#b8c2da}
