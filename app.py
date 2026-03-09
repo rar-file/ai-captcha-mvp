@@ -212,25 +212,146 @@ def _compose_program(difficulty: int, allowed_ops: Optional[List[str]] = None) -
     return prog_id, program
 
 
+def _apply_program(seq: List[Tuple[str, Tuple[int, ...]]], s: str) -> str:
+    out = s
+    for name, params in seq:
+        if name == "reverse":
+            out = _reverse(out)
+        elif name == "swap":
+            i, j = params
+            out = op_swap(i, j)(out)
+        elif name == "rotate":
+            (k,) = params
+            out = op_rotate(k)(out)
+        elif name == "caesar":
+            (k,) = params
+            out = op_caesar(k)(out)
+    return out
+
+
+def _count_solutions(
+    examples: List[Dict[str, str]],
+    allowed_ops: List[str],
+    difficulty: int,
+    max_steps: int,
+    limit: int = 2,
+) -> int:
+    """Count how many programs (up to max_steps) fit the examples.
+
+    We stop counting once we reach `limit`.
+
+    This is a safety check to avoid ambiguous puzzles (LLMs/humans guess wrong if
+    multiple rules fit the examples).
+    """
+    # Build candidate op list with bounded params.
+    max_pos = min(6, 2 + difficulty)
+    rot_max = 1 + min(6, 1 + difficulty)
+    caesar_max = 1 + min(13, 2 + difficulty * 2)
+
+    ops: List[Tuple[str, Tuple[int, ...]]] = []
+    if "reverse" in allowed_ops:
+        ops.append(("reverse", tuple()))
+    if "swap" in allowed_ops:
+        for i in range(max_pos):
+            for j in range(max_pos):
+                if i != j:
+                    ops.append(("swap", (i, j)))
+    if "rotate" in allowed_ops:
+        for k in range(1, rot_max + 1):
+            ops.append(("rotate", (k,)))
+    if "caesar" in allowed_ops:
+        for k in range(1, caesar_max + 1):
+            ops.append(("caesar", (k,)))
+
+    def fits(seq: List[Tuple[str, Tuple[int, ...]]]) -> bool:
+        for ex in examples:
+            if _apply_program(seq, ex["input"]) != ex["output"]:
+                return False
+        return True
+
+    count = 0
+
+    # DFS over sequences up to max_steps
+    seq: List[Tuple[str, Tuple[int, ...]]] = []
+
+    def dfs(depth: int):
+        nonlocal count
+        if depth > 0:
+            if fits(seq):
+                count += 1
+                if count >= limit:
+                    return True
+        if depth == max_steps:
+            return False
+        for op in ops:
+            seq.append(op)
+            if dfs(depth + 1):
+                return True
+            seq.pop()
+        return False
+
+    dfs(0)
+    return count
+
+
 def generate_puzzle(sitekey: str) -> Puzzle:
     _cleanup_expired()
 
     sk = SITEKEYS.get(sitekey) or SITEKEYS["default"]
     difficulty = int(sk.get("difficulty", 3))
     max_attempts = int(sk.get("max_attempts", 5))
+    allowed_ops = sk.get("ops") or ["swap", "rotate", "reverse", "caesar"]
 
+    # For demo UX: keep puzzles solvable quickly.
+    # More examples => less ambiguity.
+    example_count = 3 if difficulty <= 3 else 4
+    # Also cap effective steps to reduce ambiguous/multi-solution cases.
+    effective_steps = 2 if sitekey == "public-demo" else min(3, difficulty)
+
+    # Regenerate until we get a non-ambiguous rule (or give up).
+    for _ in range(12):
+        puzzle_id = uuid.uuid4().hex
+        prog_id, fn = _compose_program(effective_steps, allowed_ops=allowed_ops)
+
+        ex_words = _pick_words(example_count)
+        examples = [{"input": w, "output": fn(w)} for w in ex_words]
+
+        # Check ambiguity (only for smaller search spaces)
+        if effective_steps <= 3:
+            sol_count = _count_solutions(examples, allowed_ops, effective_steps, max_steps=effective_steps, limit=2)
+            if sol_count != 1:
+                continue
+
+        challenge = _pick_words(1)[0]
+        solution = fn(challenge)
+
+        instructions = "Infer the transformation rule from the examples and apply it to the challenge."
+
+        p = Puzzle(
+            puzzle_id=puzzle_id,
+            sitekey=sitekey,
+            difficulty=difficulty,
+            type=prog_id,
+            examples=examples,
+            challenge=challenge,
+            instructions=instructions,
+            solution=solution,
+            expires_at=_now() + PUZZLE_TTL_SECONDS,
+            created_at=_now(),
+            attempts=0,
+            max_attempts=max_attempts,
+        )
+
+        PUZZLES[puzzle_id] = p
+        return p
+
+    # Fallback: generate without ambiguity check
     puzzle_id = uuid.uuid4().hex
-
-    allowed_ops = sk.get("ops") or None
-    prog_id, fn = _compose_program(difficulty, allowed_ops=allowed_ops)
-
+    prog_id, fn = _compose_program(min(3, difficulty), allowed_ops=allowed_ops)
     ex_words = _pick_words(3)
     examples = [{"input": w, "output": fn(w)} for w in ex_words]
-
     challenge = _pick_words(1)[0]
     solution = fn(challenge)
-
-    instructions = "Infer the transformation rule from the examples and apply it to the challenge."
 
     p = Puzzle(
         puzzle_id=puzzle_id,
@@ -239,14 +360,13 @@ def generate_puzzle(sitekey: str) -> Puzzle:
         type=prog_id,
         examples=examples,
         challenge=challenge,
-        instructions=instructions,
+        instructions="Infer the transformation rule from the examples and apply it to the challenge.",
         solution=solution,
         expires_at=_now() + PUZZLE_TTL_SECONDS,
         created_at=_now(),
         attempts=0,
         max_attempts=max_attempts,
     )
-
     PUZZLES[puzzle_id] = p
     return p
 
