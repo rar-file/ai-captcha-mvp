@@ -34,6 +34,8 @@
 .aicaptcha__btn:hover{border-color:#cbd5e1}
 .aicaptcha__btn--primary{background:var(--ai-accent);border-color:var(--ai-accent);color:#fff}
 .aicaptcha__btn--primary:hover{background:var(--ai-accent-2);border-color:var(--ai-accent-2)}
+.aicaptcha__btn--copy{background:#0f172a;border-color:#0f172a;color:#fff}
+.aicaptcha__btn--copy:hover{background:#111c33;border-color:#111c33}
 .aicaptcha__btn:disabled{opacity:.6;cursor:not-allowed}
 
 .aicaptcha__input{width:100%;box-sizing:border-box;border:1px solid var(--ai-border);background:#ffffff;color:var(--ai-text);padding:10px 12px;border-radius:12px;outline:none}

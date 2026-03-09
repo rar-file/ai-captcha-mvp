@@ -68,7 +68,8 @@
 
     const input = el("input", { class: "aicaptcha__input", placeholder: "answer", autocomplete: "off" });
     const btnVerify = el("button", { class: "aicaptcha__btn aicaptcha__btn--primary", type: "button", text: "Verify" });
-    const btnCopy = el("button", { class: "aicaptcha__btn", type: "button", text: "Copy prompt" });
+    // make copy the "agent path" (idea #2)
+    const btnCopy = el("button", { class: "aicaptcha__btn aicaptcha__btn--copy", type: "button", text: "Copy prompt (agent)" });
     const btnReload = el("button", { class: "aicaptcha__btn", type: "button", text: "New" });
 
     const controls = el("div", { class: "aicaptcha__controls" }, [btnVerify, btnCopy, btnReload]);
@@ -131,7 +132,23 @@
         if (!res.pass) {
           const left = res.attempts_left != null ? ` • left ${res.attempts_left}` : "";
           status.textContent = `not verified (${res.reason || "fail"})${left}`;
-          btnVerify.disabled = false;
+
+          // (idea #3) cooldown on wrong answers to annoy humans
+          const cooldown = 6;
+          btnVerify.disabled = true;
+          let t = cooldown;
+          const tick = () => {
+            if (t <= 0) {
+              btnVerify.disabled = false;
+              btnVerify.textContent = 'Verify';
+              return;
+            }
+            btnVerify.textContent = `Wait ${t}s`;
+            t -= 1;
+            setTimeout(tick, 1000);
+          };
+          tick();
+
           return;
         }
 
