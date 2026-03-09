@@ -1,18 +1,28 @@
-# AI Captcha MVP
+# AI Captcha (MVP)
 
-An **open-source** “AI captcha” demo service.
+An open-source **AI-friendly captcha** you can embed like Turnstile.
 
-Goal: **easy for LLMs**, annoying for most humans / dumb scripts.
+This project is intentionally **easy for LLMs/agents** and **annoying for most humans / dumb scripts**.
 
-It generates a tiny pattern puzzle (`/generate`), checks the answer (`/verify`), then issues a short-lived JWT token. Tokens can be **redeemed once** (`/redeem`).
+It works by:
+- generating a short logic puzzle (`GET /generate`)
+- verifying the answer (`POST /verify`) and issuing a short-lived JWT
+- redeeming the JWT once (`POST /redeem`) on your backend
 
-## What this blocks (and what it doesn’t)
+## Demo
 
-- ✅ Blocks casual humans who won’t bother
-- ✅ Blocks simple scripts
-- ❌ Does **not** block someone who calls an LLM API to solve puzzles (that’s the point: AI-friendly)
+- Widget demo page: `GET /demo`
 
-## Run
+If you’re running it on a host with a reachable IP:
+- `http://HOST:8099/demo`
+
+## What it blocks (and what it doesn’t)
+
+- ✅ blocks casual humans (they won’t bother)
+- ✅ blocks simple scripts (rate limits + attempts + cooldown)
+- ❌ **does not** block someone who uses an LLM API to solve it (that’s the point)
+
+## Quickstart
 
 ```bash
 python3 -m venv .venv
@@ -23,46 +33,63 @@ export AI_CAPTCHA_JWT_SECRET='change-me'
 uvicorn app:app --host 0.0.0.0 --port 8099
 ```
 
-## Widget (drop-in)
+## Drop-in widget (Turnstile-ish)
 
 Serve the widget from the same origin as the API.
-
-Embed:
 
 ```html
 <link rel="stylesheet" href="https://yourdomain.com/widget.css" />
 <script src="https://yourdomain.com/widget.js" defer></script>
 
-<div class="ai-captcha" data-sitekey="public-demo" data-token-target="ai_captcha_token"></div>
-<input type="hidden" id="ai_captcha_token" name="ai_captcha_token" />
+<form method="POST" action="/submit">
+  <div class="ai-captcha" data-sitekey="public-demo" data-token-target="ai_captcha_token"></div>
+  <input type="hidden" id="ai_captcha_token" name="ai_captcha_token" />
+  <button type="submit">Continue</button>
+</form>
 ```
 
-Hooks:
-- The widget emits `aicaptcha:verified` event on the `.ai-captcha` element.
-- If `window.aiCaptchaVerified` exists, it will be called with `{token, score, sitekey, puzzle_id}`.
+### Widget hooks
 
-Demo page:
-- `GET /demo`
+- Emits an event: `aicaptcha:verified`
+  - `detail = { token, score, sitekey, puzzle_id }`
+- Optional global callback:
+  - `window.aiCaptchaVerified = ({ token, score, sitekey, puzzle_id }) => { ... }`
+
+### Sitekeys (difficulty)
+
+`GET /generate?sitekey=...`
+
+Built-in presets:
+- `public-demo` (easy-ish)
+- `default`
+- `hard` (more steps, fewer attempts)
 
 ## API
 
-### 1) Generate
+### `GET /generate`
 
 ```bash
-curl -s http://127.0.0.1:8099/generate | jq
+curl -s "http://127.0.0.1:8099/generate?sitekey=public-demo" | jq
 ```
 
-### 2) Verify
+Response includes:
+- `puzzle_id`, `examples[]`, `challenge`
+- `difficulty`, `max_attempts`, `expires_at`
 
-Replace `PUZZLE_ID` and `ANSWER`:
+### `POST /verify`
 
 ```bash
 curl -s http://127.0.0.1:8099/verify \
   -H 'Content-Type: application/json' \
-  -d '{"puzzle_id":"PUZZLE_ID","answer":"ANSWER"}' | jq
+  -d '{"puzzle_id":"PUZZLE_ID","answer":"ANSWER","action":"signup"}' | jq
 ```
 
-### 3) Redeem token (one-time)
+- On success: `{ pass: true, token, score }`
+- On fail: `{ pass: false, reason, attempts_left }`
+
+### `POST /redeem` (server-side)
+
+Redeem from **your backend**, not the browser.
 
 ```bash
 curl -s http://127.0.0.1:8099/redeem \
@@ -70,10 +97,28 @@ curl -s http://127.0.0.1:8099/redeem \
   -d '{"token":"JWT_HERE"}' | jq
 ```
 
-## Notes
+- One-time redeem per token (`already_redeemed` after).
 
-- Puzzles are stored in-memory (TTL default 120s).
-- Tokens are HS256 JWTs (TTL default 120s).
-- One-time redemption is tracked in-memory (resets on restart).
+## How the puzzles work
 
-Next step for a real project: add Redis (or DB) for puzzles + redeemed JTIs, and add per-IP rate limits.
+Each request builds a small random **program** (1–5 steps depending on difficulty), e.g.
+- `swap(i,j)`
+- `rotate(k)`
+- `reverse`
+- `caesar(k)`
+
+The program changes every request so it’s hard to “patternise” with hard-coded rules.
+
+## Security / production notes
+
+This is an MVP.
+
+For real usage:
+- use Redis/DB for puzzle storage + redeemed JTIs
+- add IP + user-agent rate limits (and maybe a server-side cooldown)
+- bind token to `origin`/`action`/`audience`
+- rotate `AI_CAPTCHA_JWT_SECRET`
+
+## License
+
+Pick a license (MIT is typical for open source). Add `LICENSE` when ready.
